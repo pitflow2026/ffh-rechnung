@@ -58,6 +58,9 @@ $secret = Add-MgApplicationPassword -ApplicationId $app.Id -PasswordCredential @
 # --- 3: Zugriff in Exchange, beschränkt auf die Rechnungspostfächer -----------
 Connect-ExchangeOnline -ShowBanner:$false
 
+# Kleine Tenants müssen eigene Rollen/Bereiche erst freischalten (einmalig, ggf. "bereits aktiviert")
+try { Enable-OrganizationCustomization -ErrorAction Stop } catch { Write-Host "Hinweis: $($_.Exception.Message)" }
+
 $group = Get-DistributionGroup -Identity "App Rechnungseingang" -ErrorAction SilentlyContinue
 if (-not $group) {
   New-DistributionGroup -Name "App Rechnungseingang" -Alias "app-rechnungseingang" -Type Security -Members $Mailboxes | Out-Null
