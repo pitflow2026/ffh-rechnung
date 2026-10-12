@@ -1,28 +1,22 @@
 import "server-only";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
-import { env } from "@/lib/env";
 import { isRelevantAttachment, type IncomingMail, type Mailbox } from "./types";
 
 export type ImapResult = { mails: IncomingMail[]; uidValidity: number };
 
 /**
- * Yahoo per IMAP. Fortschritt über UIDs: beim ersten Lauf ab `since`,
+ * IMAP-Postfächer (Yahoo, ALL-INKL …). Fortschritt über UIDs: beim ersten Lauf ab `since`,
  * danach alles mit UID > imap_last_uid. Ändert sich UIDVALIDITY,
  * wird wieder über das Datum gesucht (Duplikate fängt die Datenbank ab).
  */
 export async function fetchImapMails(mailbox: Mailbox, since: Date, limit: number): Promise<ImapResult> {
-  const client = new ImapFlow({
-    host: "imap.mail.yahoo.com",
-    port: 993,
-    secure: true,
-    auth: { user: env.yahooUser(), pass: env.yahooAppPassword() },
-    logger: false,
-  });
+  const { host, port, user, pass } = imapSettings(mailbox);
+  const client = new ImapFlow({ host, port, secure: true, auth: { user, pass }, logger: false });
   try {
     await client.connect();
   } catch (e) {
-    throw new Error(`Yahoo-Anmeldung fehlgeschlagen: ${describeImapError(e)}`);
+    throw new Error(`IMAP-Anmeldung bei ${host} fehlgeschlagen: ${describeImapError(e)}`);
   }
   const lock = await client.getMailboxLock(mailbox.folder === "inbox" ? "INBOX" : mailbox.folder);
   try {
@@ -66,7 +60,7 @@ export async function fetchImapMails(mailbox: Mailbox, since: Date, limit: numbe
     mails.sort((a, b) => (a.uid ?? 0) - (b.uid ?? 0));
     return { mails, uidValidity };
   } catch (e) {
-    throw new Error(`Yahoo-Abruf fehlgeschlagen: ${describeImapError(e)}`);
+    throw new Error(`IMAP-Abruf fehlgeschlagen: ${describeImapError(e)}`);
   } finally {
     lock.release();
     await client.logout().catch(() => undefined);
@@ -78,7 +72,19 @@ function describeImapError(e: unknown): string {
   if (!(e instanceof Error)) return String(e);
   const x = e as Error & { responseText?: string; serverResponseCode?: string; authenticationFailed?: boolean; code?: string };
   if (x.authenticationFailed || x.serverResponseCode === "AUTHENTICATIONFAILED") {
-    return "Benutzername oder App-Passwort falsch (YAHOO_IMAP_USER / YAHOO_IMAP_APP_PASSWORD prüfen)";
+    return "Benutzername oder Passwort falsch";
   }
   return [x.message, x.serverResponseCode, x.responseText, x.code].filter(Boolean).join(" · ");
+}
+
+/** Zugangsdaten je Postfach; das Passwort kommt aus der genannten Umgebungsvariable. */
+function imapSettings(mailbox: Mailbox) {
+  // Altbestand: Yahoo ohne eigene Spalten
+  const host = mailbox.imap_host ?? "imap.mail.yahoo.com";
+  if (host.includes("<")) throw new Error("IMAP-Server für dieses Postfach ist noch nicht eingetragen (Spalte imap_host)");
+  const user = mailbox.imap_user ?? process.env.YAHOO_IMAP_USER ?? mailbox.address;
+  const envName = mailbox.imap_password_env ?? "YAHOO_IMAP_APP_PASSWORD";
+  const pass = process.env[envName]?.trim();
+  if (!pass) throw new Error(`Passwort fehlt: Umgebungsvariable ${envName} in Vercel anlegen`);
+  return { host, port: mailbox.imap_port ?? 993, user, pass };
 }

@@ -28,6 +28,10 @@ export type Mailbox = {
   synced_until: string | null;
   imap_uidvalidity: number | null;
   imap_last_uid: number | null;
+  imap_host: string | null;
+  imap_port: number | null;
+  imap_user: string | null;
+  imap_password_env: string | null;
 };
 
 /** Nur Rechnungsrelevante Dateitypen werden übernommen. */

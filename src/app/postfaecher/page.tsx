@@ -44,7 +44,7 @@ export default async function MailboxesPage() {
               <tr key={b.id} className="border-b border-[#efede7] align-top">
                 <td className="px-4 py-3">
                   <p className="font-semibold">{b.address}</p>
-                  <p className="text-xs text-muted">{b.provider === "graph" ? "Microsoft 365" : "Yahoo (IMAP)"}</p>
+                  <p className="text-xs text-muted">{b.provider === "graph" ? "Microsoft 365" : `IMAP · ${b.imap_host ?? "imap.mail.yahoo.com"}`}</p>
                 </td>
                 <td className="px-3 py-3">{b.default_company_id ? coName.get(b.default_company_id) : <span className="text-muted">mehrere</span>}</td>
                 <td className="px-3 py-3 text-right font-mono">{count.get(b.id) ?? 0}</td>
