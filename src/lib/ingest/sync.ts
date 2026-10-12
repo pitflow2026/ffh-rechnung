@@ -25,7 +25,9 @@ export type MailboxRun = {
 export async function runSync(opts: { deadline: number }): Promise<MailboxRun[]> {
   const db = createAdminClient();
   const [{ data: boxes, error: boxErr }, { data: companies, error: coErr }] = await Promise.all([
-    db.from("mailboxes").select("*").eq("active", true).order("address"),
+    // Am längsten nicht abgerufene Postfächer zuerst – so kommt bei
+    // begrenzter Laufzeit jedes Postfach reihum dran.
+    db.from("mailboxes").select("*").eq("active", true).order("last_run_at", { ascending: true, nullsFirst: true }),
     db.from("companies").select("id, name, hints").order("sort"),
   ]);
   if (boxErr || coErr) throw new Error(boxErr?.message ?? coErr?.message);

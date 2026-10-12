@@ -19,7 +19,11 @@ export async function fetchImapMails(mailbox: Mailbox, since: Date, limit: numbe
     auth: { user: env.yahooUser(), pass: env.yahooAppPassword() },
     logger: false,
   });
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (e) {
+    throw new Error(`Yahoo-Anmeldung fehlgeschlagen: ${describeImapError(e)}`);
+  }
   const lock = await client.getMailboxLock(mailbox.folder === "inbox" ? "INBOX" : mailbox.folder);
   try {
     const box = client.mailbox;
@@ -60,8 +64,20 @@ export async function fetchImapMails(mailbox: Mailbox, since: Date, limit: numbe
     }
     mails.sort((a, b) => (a.uid ?? 0) - (b.uid ?? 0));
     return { mails, uidValidity };
+  } catch (e) {
+    throw new Error(`Yahoo-Abruf fehlgeschlagen: ${describeImapError(e)}`);
   } finally {
     lock.release();
     await client.logout().catch(() => undefined);
   }
+}
+
+/** ImapFlow meldet oft nur "Command failed" – die eigentliche Ursache steckt in den Zusatzfeldern. */
+function describeImapError(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const x = e as Error & { responseText?: string; serverResponseCode?: string; authenticationFailed?: boolean; code?: string };
+  if (x.authenticationFailed || x.serverResponseCode === "AUTHENTICATIONFAILED") {
+    return "Benutzername oder App-Passwort falsch (YAHOO_IMAP_USER / YAHOO_IMAP_APP_PASSWORD prüfen)";
+  }
+  return [x.message, x.serverResponseCode, x.responseText, x.code].filter(Boolean).join(" · ");
 }
