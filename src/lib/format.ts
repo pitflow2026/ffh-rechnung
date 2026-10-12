@@ -48,6 +48,8 @@ export function hrefFor(f: Filters, patch: Partial<Filters>, base = "/") {
   if (next.period !== "alle") sp.set("period", next.period);
   if (next.box !== "alle") sp.set("box", next.box);
   if (next.q) sp.set("q", next.q);
+  if (next.min) sp.set("min", next.min);
+  if (next.max) sp.set("max", next.max);
   if (next.sel) sp.set("sel", next.sel);
   const s = sp.toString();
   return s ? `${base}?${s}` : base;

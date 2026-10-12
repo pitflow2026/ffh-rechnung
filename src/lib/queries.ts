@@ -7,6 +7,8 @@ export type Filters = {
   period: string; // 'alle' | 'YYYY-MM'
   box: string; // 'alle' | Postfach-ID
   q: string;
+  min: string; // Brutto ab (Eingabe wie getippt)
+  max: string; // Brutto bis
   sel: string | null;
 };
 
@@ -30,6 +32,8 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
     period: /^\d{4}-\d{2}$/.test(period) ? period : "alle",
     box: one("box") || "alle",
     q: one("q").slice(0, 100),
+    min: parseAmount(one("min")) != null ? one("min").slice(0, 20) : "",
+    max: parseAmount(one("max")) != null ? one("max").slice(0, 20) : "",
     sel: one("sel") || null,
   };
 }
@@ -74,6 +78,17 @@ export type DocRow = {
 const DOC_COLUMNS =
   "id, company_id, mailbox_id, received_at, doc_type, status, supplier, invoice_number, invoice_date, due_date, net, vat, gross, currency, einvoice_format, ai_note, reference_number, related_document_id, extraction_error, booked_at, booked_by";
 
+/** Liest Beträge wie "1.234,56", "1234,5", "1234.56" oder "99 €". */
+export function parseAmount(input: string): number | null {
+  let s = input.replace(/[€\s]/g, "").replace(/eur$/i, "");
+  if (!/^-?[\d.,]+$/.test(s) || !/\d/.test(s)) return null;
+  if (s.includes(",") && s.includes(".")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (s.includes(",")) s = s.replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
+
 export function monthRange(period: string) {
   const [y, m] = period.split("-").map(Number);
   const from = new Date(Date.UTC(y, m - 1, 1));
@@ -105,9 +120,16 @@ export function buildListQuery(f: Filters, columns = DOC_COLUMNS) {
     q = q.gte("received_at", from).lt("received_at", to);
   }
   if (f.box !== "alle") q = q.eq("mailbox_id", f.box);
+  const min = parseAmount(f.min);
+  const max = parseAmount(f.max);
+  if (min != null) q = q.gte("gross", min);
+  if (max != null) q = q.lte("gross", max);
   if (f.q.trim()) {
     const term = f.q.trim().replace(/[%,()*\\]/g, " ");
-    q = q.or(`supplier.ilike.%${term}%,invoice_number.ilike.%${term}%,ai_note.ilike.%${term}%`);
+    // Sieht die Suche wie ein Betrag aus (z. B. "1.234,56"), auch genau diesen Bruttobetrag finden
+    const amount = parseAmount(f.q);
+    const amountClause = amount != null ? `,gross.eq.${amount.toFixed(2)}` : "";
+    q = q.or(`supplier.ilike.%${term}%,invoice_number.ilike.%${term}%,ai_note.ilike.%${term}%${amountClause}`);
   }
   return q.order("received_at", { ascending: false });
 }
