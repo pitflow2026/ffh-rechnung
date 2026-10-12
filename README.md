@@ -35,6 +35,8 @@ Unter **/postfaecher** sieht man pro Postfach, bis wann abgerufen wurde und ob e
 5. Für zuverlässigen Mailversand der Anmeldelinks eigenen SMTP eintragen (Authentication → SMTP), z. B. Resend.
 
 ### 2. Microsoft Entra (Outlook-Postfächer)
+**Schnellweg:** `docs/einrichtung-microsoft.ps1` in PowerShell ausführen. Das Skript legt die App an, erzeugt den Schlüssel, beschränkt den Zugriff auf die Rechnungspostfächer und gibt am Ende die drei Werte für Vercel aus. Die Schritte unten sind der manuelle Weg.
+
 1. entra.microsoft.com → App-Registrierungen → **Neue Registrierung**: Name „FFH Rechnungseingang“, nur dieser Mandant.
 2. **Zertifikate & Geheimnisse** → neuen geheimen Clientschlüssel anlegen, Wert sofort kopieren.
 3. Notieren: Verzeichnis-(Mandanten-)ID, Anwendungs-(Client-)ID, Schlüssel → in Vercel eintragen.
