@@ -32,7 +32,7 @@ const TOOL = {
         type: "string",
         enum: ["rechnung", "mahnung", "gutschrift", "sonstiges"],
         description:
-          "rechnung = Eingangsrechnung oder Abschlagsrechnung; mahnung = Zahlungserinnerung/Mahnung; gutschrift = Gutschrift/Rechnungskorrektur zu unseren Gunsten; sonstiges = kein Buchungsbeleg (AGB, Lieferschein, Werbung, Angebot, Auftragsbestätigung …)",
+          "rechnung = Eingangsrechnung oder Abschlagsrechnung; mahnung = Zahlungserinnerung/Mahnung; gutschrift = Gutschrift/Rechnungskorrektur zu unseren Gunsten; sonstiges = kein Buchungsbeleg (AGB, Datenschutzhinweis, Lieferschein, Angebot, Auftrags-/Bestell-/Versandbestätigung, Newsletter, Werbung, Vertrag, Kontoauszug, Lohnabrechnung, Kündigung, Terminbestätigung …)",
       },
       company_id: {
         type: ["string", "null"],

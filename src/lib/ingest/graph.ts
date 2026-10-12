@@ -52,6 +52,7 @@ type GraphMessage = {
   id: string;
   internetMessageId?: string;
   subject?: string;
+  bodyPreview?: string;
   receivedDateTime: string;
   from?: { emailAddress?: { address?: string; name?: string } };
 };
@@ -76,7 +77,7 @@ export async function fetchGraphMails(mailbox: Mailbox, since: Date, limit: numb
   const filter = encodeURIComponent(`receivedDateTime ge ${since.toISOString()} and hasAttachments eq true`);
   let url: string | undefined =
     `/users/${user}/mailFolders/${folder}/messages?$filter=${filter}&$orderby=receivedDateTime asc` +
-    `&$select=id,internetMessageId,subject,receivedDateTime,from&$top=25`;
+    `&$select=id,internetMessageId,subject,bodyPreview,receivedDateTime,from&$top=25`;
 
   const out: IncomingMail[] = [];
   while (url && out.length < limit) {
@@ -101,6 +102,7 @@ export async function fetchGraphMails(mailbox: Mailbox, since: Date, limit: numb
         fromAddress: m.from?.emailAddress?.address ?? null,
         fromName: m.from?.emailAddress?.name ?? null,
         subject: m.subject ?? null,
+        bodyPreview: m.bodyPreview ?? null,
         receivedAt: new Date(m.receivedDateTime),
         attachments,
       });

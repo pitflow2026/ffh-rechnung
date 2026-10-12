@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractDocument, type Company, type Extraction } from "@/lib/extract";
+import { looksLikeInvoiceMail } from "./filter";
 import type { IncomingAttachment, IncomingMail, Mailbox } from "./types";
 
 const AUTO_ASSIGN_CONFIDENCE = 0.8;
@@ -114,6 +115,9 @@ export async function processMail(
     if (emailErr?.code === "23505") return { ...result, skippedMail: true };
     throw new Error(`Mail konnte nicht gespeichert werden: ${emailErr?.message}`);
   }
+
+  // Keine Rechnung/Mahnung erkennbar: Mail als erledigt merken, aber nichts anlegen
+  if (!looksLikeInvoiceMail(mail)) return { ...result, skippedMail: false };
 
   for (const group of groupAttachments(mail.attachments)) {
     const hash = sha256(group.primary.content);

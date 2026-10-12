@@ -51,6 +51,7 @@ export async function fetchImapMails(mailbox: Mailbox, since: Date, limit: numbe
         fromAddress: from?.address ?? null,
         fromName: from?.name || null,
         subject: parsed.subject ?? null,
+        bodyPreview: (parsed.text ?? "").slice(0, 3000),
         receivedAt: msg.internalDate ? new Date(msg.internalDate) : parsed.date ?? new Date(),
         uid: msg.uid,
         attachments: parsed.attachments

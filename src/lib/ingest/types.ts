@@ -10,6 +10,8 @@ export type IncomingMail = {
   fromAddress: string | null;
   fromName: string | null;
   subject: string | null;
+  /** Anfang des Mailtexts (für den Rechnungs-Vorfilter) */
+  bodyPreview?: string | null;
   receivedAt: Date;
   attachments: IncomingAttachment[];
   /** Nur IMAP: UID für den Fortschrittszeiger */
