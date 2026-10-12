@@ -6,9 +6,9 @@ import { env } from "@/lib/env";
 export type Company = { id: string; name: string; hints: string };
 
 export const Extraction = z.object({
-  doc_type: z.enum(["rechnung", "mahnung", "gutschrift", "sonstiges"]),
+  doc_type: z.preprocess((v) => (typeof v === "string" ? v.toLowerCase() : v), z.enum(["rechnung", "mahnung", "gutschrift", "sonstiges"])),
   company_id: z.string().nullable(),
-  company_confidence: z.number().min(0).max(1),
+  company_confidence: z.number().transform((n) => Math.min(1, Math.max(0, n))),
   company_reason: z.string(),
   supplier: z.string().nullable(),
   invoice_number: z.string().nullable(),
@@ -57,6 +57,7 @@ const TOOL = {
       "doc_type", "company_id", "company_confidence", "company_reason", "supplier", "invoice_number",
       "invoice_date", "due_date", "net", "vat", "gross", "currency", "reference_number",
     ],
+    additionalProperties: false,
   },
 };
 
@@ -98,7 +99,7 @@ export async function extractDocument(input: {
     `Absender: ${input.fromAddress ?? "unbekannt"}`,
     `Betreff: ${input.subject ?? "(kein Betreff)"}`,
     `Dateiname: ${primaryFile.filename}`,
-    "Lies den Beleg aus und rufe das Werkzeug beleg_erfassen auf. Erfinde nichts: Was nicht auf dem Beleg steht, ist null. " +
+    "Lies den Beleg aus und antworte ausschließlich im vorgegebenen JSON-Format. Erfinde nichts: Was nicht auf dem Beleg steht, ist null. " +
       "Ordne nur dann ein Unternehmen zu, wenn Name oder Anschrift des Rechnungsempfängers dazu passt; sonst company_id = null.",
   ].join("\n\n");
 
@@ -109,17 +110,19 @@ export async function extractDocument(input: {
         source: { type: "base64", media_type: "application/pdf", data: primaryFile.content.toString("base64") },
       } as const);
 
+  // Strukturierte Ausgabe: die Antwort ist garantiert JSON nach SCHEMA
   const res = await anthropic().messages.create({
     model: env.anthropicModel(),
-    max_tokens: 1024,
-    tools: [TOOL],
-    tool_choice: { type: "tool", name: TOOL.name },
+    max_tokens: 4096,
+    output_config: { format: { type: "json_schema", schema: TOOL.input_schema } },
     messages: [{ role: "user", content: [fileBlock, { type: "text", text: context }] }],
   });
 
-  const use = res.content.find((b) => b.type === "tool_use");
-  if (!use || use.type !== "tool_use") throw new Error("KI hat keine Daten geliefert");
-  const parsed = Extraction.parse(use.input);
+  if (res.stop_reason === "refusal") throw new Error("KI hat das Auslesen abgelehnt");
+  if (res.stop_reason === "max_tokens") throw new Error("Antwort der KI abgeschnitten");
+  const text = res.content.find((b) => b.type === "text");
+  if (!text || text.type !== "text") throw new Error("KI hat keine Daten geliefert");
+  const parsed = Extraction.parse(JSON.parse(text.text));
   if (parsed.company_id && !input.companies.some((c) => c.id === parsed.company_id)) {
     parsed.company_id = null;
     parsed.company_confidence = 0;
