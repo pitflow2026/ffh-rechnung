@@ -21,7 +21,8 @@ $Mailboxes = @(
   "adenau@ffh-enterprises.com",
   "daun@ffh-enterprises.com",
   "emmelshausen@ffh-enterprises.com",
-  "immobilien@ffh-enterprises.com"
+  "immobilien@ffh-enterprises.com",
+  "hillesheim@ffh-enterprises.com"
 )
 # Ein Postfach, das die App NICHT lesen darf (nur für den Test am Ende)
 $NotAllowed = "paul@ffh-enterprises.com"

@@ -27,7 +27,8 @@ $Mailboxes = @(
   "adenau@ffh-enterprises.com",
   "daun@ffh-enterprises.com",
   "emmelshausen@ffh-enterprises.com",
-  "immobilien@ffh-enterprises.com"
+  "immobilien@ffh-enterprises.com",
+  "hillesheim@ffh-enterprises.com"
 )
 
 Connect-ExchangeOnline
