@@ -4,7 +4,7 @@ import { env } from "@/lib/env";
 import type { Company } from "@/lib/extract";
 import { fetchGraphMails } from "./graph";
 import { fetchImapMails } from "./imap";
-import { processMail } from "./process";
+import { processMail, reprocessDocument } from "./process";
 import type { IncomingMail, Mailbox } from "./types";
 
 const MAILS_PER_MAILBOX = 40;
@@ -37,7 +37,28 @@ export async function runSync(opts: { deadline: number }): Promise<MailboxRun[]>
     if (Date.now() > opts.deadline) break;
     runs.push(await syncMailbox(mailbox, (companies ?? []) as Company[], opts.deadline));
   }
+  await retryFailedExtractions((companies ?? []) as Company[], opts.deadline);
   return runs;
+}
+
+/** Belege, deren Auslesen fehlgeschlagen ist, bei jedem Lauf erneut versuchen. */
+async function retryFailedExtractions(companies: Company[], deadline: number) {
+  const db = createAdminClient();
+  const { data } = await db
+    .from("documents")
+    .select("id")
+    .not("extraction_error", "is", null)
+    .order("updated_at", { ascending: true })
+    .limit(15);
+  for (const d of data ?? []) {
+    if (Date.now() > deadline) break;
+    try {
+      const ok = await reprocessDocument(db, d.id, companies);
+      if (!ok) break; // KI weiterhin nicht erreichbar – nächster Lauf
+    } catch {
+      // einzelner Beleg defekt: überspringen
+    }
+  }
 }
 
 async function syncMailbox(mailbox: Mailbox, companies: Company[], deadline: number): Promise<MailboxRun> {

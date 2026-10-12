@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { runSync } from "@/lib/ingest/sync";
+import { reprocessDocument } from "@/lib/ingest/process";
 
 const ID = /^[0-9a-f-]{36}$/;
 
@@ -61,5 +62,16 @@ export async function assignCompany(formData: FormData) {
 export async function syncNow() {
   await requireUser();
   await runSync({ deadline: Date.now() + 50_000 });
+  revalidatePath("/");
+}
+
+export async function reExtract(formData: FormData) {
+  const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  if (!ID.test(id)) return;
+  const db = createAdminClient();
+  const { data: companies } = await db.from("companies").select("id, name, hints").order("sort");
+  await reprocessDocument(db, id, companies ?? []);
+  await log(id, user.email, "Neu ausgelesen");
   revalidatePath("/");
 }

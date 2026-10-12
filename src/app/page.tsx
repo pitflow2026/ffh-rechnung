@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { assignCompany, setStatus, syncNow } from "@/app/actions";
+import { assignCompany, reExtract, setStatus, syncNow } from "@/app/actions";
 import { signOut } from "@/app/login/actions";
 import { requireUser } from "@/lib/auth";
 import { DOC_TYPE_LABEL, STATUS_LABEL, dateDE, dateTimeDE, eur, hrefFor, lastMonths } from "@/lib/format";
@@ -431,6 +431,12 @@ function Detail({
             </StatusForm>
           )
         )}
+        <form action={reExtract}>
+          <input type="hidden" name="id" value={d.id} />
+          <SubmitButton pendingLabel="Liest aus …" className="h-11 rounded-lg border border-line-strong px-3.5 text-sm font-semibold">
+            Neu auslesen
+          </SubmitButton>
+        </form>
       </div>
       {d.booked_at && (
         <p className="text-xs text-muted">

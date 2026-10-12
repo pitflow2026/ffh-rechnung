@@ -235,3 +235,77 @@ export async function processMail(
   }
   return result;
 }
+
+/**
+ * Liest einen bereits gespeicherten Beleg erneut aus (z. B. nachdem die KI
+ * nicht erreichbar war). Manuelle Entscheidungen bleiben erhalten:
+ * Unternehmen nur setzen, wenn noch keins zugeordnet ist, Status nur
+ * ändern, solange der Beleg auf „Zu prüfen“ steht.
+ */
+export async function reprocessDocument(db: SupabaseClient, documentId: string, companies: Company[]) {
+  const { data: doc, error } = await db
+    .from("documents")
+    .select("id, status, company_id, mailbox_id, invoice_number, supplier, emails(subject, from_address, from_name)")
+    .eq("id", documentId)
+    .single();
+  if (error || !doc) throw new Error(`Beleg nicht gefunden: ${error?.message}`);
+
+  const [{ data: mailbox }, { data: files }] = await Promise.all([
+    db.from("mailboxes").select("*").eq("id", doc.mailbox_id).single(),
+    db.from("document_files").select("filename, content_type, storage_path").eq("document_id", documentId),
+  ]);
+  if (!mailbox || !files?.length) throw new Error("Postfach oder Datei zum Beleg fehlt");
+
+  const primary = files.find((f) => f.filename.toLowerCase().endsWith(".xml")) ?? files[0];
+  const { data: blob } = await db.storage.from("belege").download(primary.storage_path);
+  if (!blob) throw new Error("Originaldatei nicht abrufbar");
+  const email = (Array.isArray(doc.emails) ? doc.emails[0] : doc.emails) as
+    | { subject: string | null; from_address: string | null; from_name: string | null }
+    | null;
+
+  let ex: Extraction | null = null;
+  let extractionError: string | null = null;
+  try {
+    ex = await extractDocument({
+      companies,
+      mailboxAddress: mailbox.address,
+      mailboxCompanyId: mailbox.default_company_id,
+      subject: email?.subject ?? null,
+      fromAddress: email?.from_address ?? null,
+      primaryFile: { filename: primary.filename, contentType: primary.content_type, content: Buffer.from(await blob.arrayBuffer()) },
+    });
+  } catch (e) {
+    extractionError = e instanceof Error ? e.message : String(e);
+  }
+
+  if (!ex) {
+    await db.from("documents").update({ extraction_error: extractionError, updated_at: new Date().toISOString() }).eq("id", documentId);
+    return false;
+  }
+
+  const decision = decide(ex, mailbox as Mailbox);
+  const manualCompany = doc.company_id != null && doc.status !== "pruefen";
+  await db
+    .from("documents")
+    .update({
+      company_id: manualCompany ? doc.company_id : decision.company_id ?? doc.company_id,
+      status: doc.status === "pruefen" ? decision.status : doc.status,
+      doc_type: ex.doc_type,
+      supplier: ex.supplier ?? doc.supplier,
+      invoice_number: ex.invoice_number,
+      invoice_date: validDate(ex.invoice_date),
+      due_date: validDate(ex.due_date),
+      net: ex.net,
+      vat: ex.vat,
+      gross: ex.gross,
+      currency: ex.currency || "EUR",
+      confidence: ex.company_confidence,
+      ai_note: decision.note,
+      reference_number: ex.reference_number,
+      extraction: ex,
+      extraction_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", documentId);
+  return true;
+}
