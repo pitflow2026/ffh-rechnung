@@ -62,7 +62,15 @@ const TOOL = {
 
 let client: Anthropic | null = null;
 function anthropic() {
-  if (!client) client = new Anthropic({ apiKey: env.anthropicKey() });
+  if (!client) {
+    // Organisationsweite Schlüssel brauchen die Workspace-ID als Header;
+    // Workspace-gebundene Schlüssel kommen ohne aus.
+    const workspace = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
+    client = new Anthropic({
+      apiKey: env.anthropicKey().trim(),
+      defaultHeaders: workspace ? { "anthropic-workspace-id": workspace } : undefined,
+    });
+  }
   return client;
 }
 
