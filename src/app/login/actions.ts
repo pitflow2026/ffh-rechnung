@@ -19,7 +19,16 @@ export async function sendLoginLink(_prev: LoginState, formData: FormData): Prom
       email,
       options: { emailRedirectTo: `${env.appUrl()}/auth/callback`, shouldCreateUser: true },
     });
-    if (error) return { sent: false, error: "Der Link konnte nicht verschickt werden. Bitte später erneut versuchen." };
+    if (error) {
+      console.error("Anmeldelink fehlgeschlagen:", error.status, error.code, error.message);
+      const rateLimited = error.status === 429 || /rate limit/i.test(error.message);
+      return {
+        sent: false,
+        error: rateLimited
+          ? "Zu viele Anmeldelinks in kurzer Zeit. Bitte in einer Stunde erneut versuchen."
+          : `Der Link konnte nicht verschickt werden (${error.message}).`,
+      };
+    }
   }
   return { sent: true, error: null };
 }
